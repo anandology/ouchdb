@@ -1,9 +1,13 @@
 import web
 from . import schema
 
+
 class Engine:
-    def __init__(self, db=None):
-        self.db = db or web.database(dbn="sqlite", db="ouch.db")
+    def __init__(self):
+        self.init()
+        
+    def init(self):
+        self.db = web.database(dbn="sqlite", db="ouch.db")
         self.init_schema()
         
     def init_schema(self):
@@ -19,14 +23,17 @@ class Engine:
     def create_database(self, name):
         t = self.db.transaction()
         try:
-            dbname = "db_" + name
-            self.db.insert("databases", name=name)
-            self.db.query(schema.DATABASE_TABLE % dbname)
+            if not self.get_database(name):
+                dbname = "db_" + name
+                self.db.insert("databases", name=name)
+                self.db.query(schema.DATABASE_TABLE % dbname)
+                return True
         except:
             t.rollback()
             raise
         finally:
             t.commit()
+        return False
             
     def delete_database(self, name):
         t = self.db.transaction()
@@ -51,6 +58,11 @@ class Engine:
         rows = self.db.query("SELECT name FROM databases")
         return [row.name for row in rows]
         
+class MemoryEngine(Engine):
+    def init(self):
+        self.db = web.database(dbn="sqlite", db=":memory:")
+        self.init_schema()
+        
 class Database:
     def __init__(self, id, name, **kw):
         self.id = id
@@ -73,5 +85,9 @@ class Database:
         }
         
     def list_docs(self):
-        #rows = db.query("SELECT * FROM %s" % self.table)
-        return []
+        rows = db.query("SELECT * FROM %s" % self.table)
+        return rows.list()
+        
+    def add_doc(self, doc):
+        pass
+    

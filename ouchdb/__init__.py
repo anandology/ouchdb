@@ -2,8 +2,10 @@
 """
 
 from version import VERSION
-from webapp import app
+import webapp
+
+webapp.setup()
 
 __version__ = VERSION
 
-wsgi = app.wsgifunc()
+wsgi = webapp.app.wsgifunc()
