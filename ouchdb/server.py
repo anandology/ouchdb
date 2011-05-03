@@ -1,3 +1,4 @@
+import uuid
 import json
 import web
 import os
@@ -38,6 +39,20 @@ class session(app.page):
     
     def GET(self):
         return '{"ok":true,"userCtx":{"name":null,"roles":["_admin"]},"info":{"authentication_db":"_users","authentication_handlers":["oauth","cookie","default"],"authenticated":"default"}}'
+
+class _uuids(app.page):
+    path = "/_uuids"
+
+    def GET(self):
+        web.header("Content-Type", "text/plain;charset=utf-8")
+        try:
+            i = web.input(count=1)
+            count = int(i.count)
+        except ValueError:
+            return '{"error":"unknown_error","reason":"badarg"}'
+
+        uuids = [str(uuid.uuid1()).replace("-", "") for i in range(count)]
+        return json.dumps({"uuids": uuids})
 
 class _utils(app.page):
     path = "/_utils"
