@@ -7,3 +7,4 @@ engine = Engine()
 
 def setup():
     import server
+    import database

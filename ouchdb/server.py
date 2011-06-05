@@ -1,7 +1,7 @@
-import uuid
 import json
 import web
 import os
+import urlparse
 
 from webapp import app, engine
 from version import VERSION
@@ -15,8 +15,14 @@ class PreconditionFailed(web.HTTPError):
         web.HTTPError.__init__(self, '412 Precondition Failed', {}, json.dumps(data))
 
 class Created(web.HTTPError):
-    def __init__(self, data):
-        web.HTTPError.__init__(self, '201 Created', {}, json.dumps(data))
+    def __init__(self, location, data):
+        location = urlparse.urljoin(web.ctx.path, location)
+        if location.startswith('/'):
+            location = web.ctx.home + location
+        headers = {
+            "Location": location
+        }
+        web.HTTPError.__init__(self, '201 Created', headers, json.dumps(data))
 
 class ouchdb(app.page):
     path = "/"
@@ -51,7 +57,7 @@ class _uuids(app.page):
         except ValueError:
             return '{"error":"unknown_error","reason":"badarg"}'
 
-        uuids = [str(uuid.uuid1()).replace("-", "") for i in range(count)]
+        uuids = [engine.generate_uuid() for i in range(count)]
         return json.dumps({"uuids": uuids})
 
 class _utils(app.page):
@@ -73,7 +79,7 @@ class utils(app.page):
             return web.notfound("")
             
 class database(app.page):
-    path = "/([^_/][^/]*)"
+    path = "/([^_/][^/]*)/?"
     
     def GET(self, name):
         db = engine.get_database(name)
@@ -83,6 +89,14 @@ class database(app.page):
             return json.dumps(db.info())
         else:
             raise NotFound({"error":"not_found","reason":"no_db_file"})
+            
+    def POST(self, name):
+        db = engine.get_database(dbname)
+        if db:
+            return json.dumps(db.info())
+        else:
+            raise NotFound({"error":"not_found","reason":"no_db_file"})
+        
 
     def PUT(self, name):
         web.header("Content-Type", "text/plain;charset=utf-8")
@@ -90,7 +104,7 @@ class database(app.page):
         db = engine.get_database(name)
         if db is None:
             engine.create_database(name)
-            raise Created({"ok": True})
+            raise Created("/" + name, {"ok": True})
         else:
             raise PreconditionFailed({"error": "file_exists", "reason": "The database could not be created, the file already exists."})
 
@@ -99,16 +113,5 @@ class database(app.page):
 
         if engine.delete_database(name):
             return json.dumps({"ok": True})
-        else:
-            raise NotFound({"error":"not_found","reason":"no_db_file"})
-
-class all_docs(app.page):
-    path = "/([^_/][^/]*)/_all_docs"
-
-    def GET(self, dbname):
-        db = engine.get_database(dbname)
-        if db:
-            web.header("Content-Type", "text/plain;charset=utf-8")
-            return '{"total_rows":0,"offset":0,"rows":[]}'
         else:
             raise NotFound({"error":"not_found","reason":"no_db_file"})

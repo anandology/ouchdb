@@ -1,6 +1,8 @@
+import uuid
+import json
+
 import web
 from . import schema
-
 
 class Engine:
     def __init__(self):
@@ -63,6 +65,9 @@ class MemoryEngine(Engine):
         self.db = web.database(dbn="sqlite", db=":memory:")
         self.init_schema()
         
+def generate_uuid():
+    return str(uuid.uuid1()).replace("-", "")
+
 class Database:
     def __init__(self, id, name, **kw):
         self.id = id
@@ -89,5 +94,7 @@ class Database:
         return rows.list()
         
     def add_doc(self, doc):
-        pass
-    
+        with db.transaction():
+            _id = doc.get("id") or generate_uuid()
+            db.delete(self.table, where="id=$id", vars={"id": _d})
+            _rev = db.insert(self.table, id=id, doc=json.dumps(doc))
