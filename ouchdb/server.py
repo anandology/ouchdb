@@ -4,6 +4,7 @@ import os
 
 from .webapp import app, engine
 from .version import VERSION
+from .engine import Conflict
 from . import http
 
 class ouchdb(app.page):
@@ -73,12 +74,17 @@ class database(app.page):
             raise http.NotFound({"error":"not_found","reason":"no_db_file"})
             
     def POST(self, name):
-        db = engine.get_database(dbname)
-        if db:
-            return json.dumps(db.info())
-        else:
-            raise http.NotFound({"error":"not_found","reason":"no_db_file"})
+        db = engine.get_database(name)
+        if not db:
+            raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+
+        data = json.loads(web.data())
+        try:
+            _id, _rev = db.put(data)
+        except Conflict:
+            raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
+        return json.dumps({"ok": True, "id": _id, "rev": _rev})
 
     def PUT(self, name):
         web.header("Content-Type", "text/plain;charset=utf-8")
