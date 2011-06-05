@@ -40,6 +40,12 @@ class TestDatabase:
             "x": 1
         }
         
+    def test_delete(self):
+        id, rev = self.db.put({"_id": "foo", "x": 1})
+        self.db.delete("foo", rev=rev)
+        
+        assert self.db.get("foo") == {"_id": "foo", "_rev": "2", "_deleted": True}
+        
     def test_put_rev(self):
         for i in range(10):
             id, rev = self.db.put({"_id": "foo", "x": i, "_rev": str(i)})

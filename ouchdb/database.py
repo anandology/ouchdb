@@ -25,6 +25,8 @@ class document(app.page):
         doc = db.get(docid)
         if doc:
             web.header("Content-Type", "text/plain;charset=utf-8")
+            if doc.get("_deleted"):
+                raise http.NotFound({"error": "not_found", "reason": "deleted"})
             return json.dumps(doc)
         else:
             raise http.NotFound({"error": "not_found", "reason": "missing"})
@@ -43,3 +45,17 @@ class document(app.page):
             raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
         return json.dumps({"ok": True, "id": _id, "rev": _rev})
+        
+    def DELETE(self, dbname, docid):
+        db = engine.get_database(dbname)
+        if not db:
+            raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+        
+        try:
+            i = web.input(rev=None)
+            _id, _rev = db.delete(docid, i.rev)
+        except Conflict:
+            raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
+        
+        return json.dumps({"ok": True, "id": _id, "rev": _rev})
+        

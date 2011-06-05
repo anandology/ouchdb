@@ -109,32 +109,47 @@ class Database:
     def put(self, doc):
         with self.db.transaction():
             _id = doc.get("_id")
-            if _id:
-                old_doc = self.get(_id)
-            else:
-                _id = generate_uuid()
-                doc['_id'] = _id
-                old_doc = None
-                
+            old_doc = _id and self.get(_id)
             
             if old_doc:
-                if old_doc['_rev'] != doc.get('_rev'):
-                    raise Conflict()
-                    
-                
-                rev = str(1 + int(old_doc['_rev']))
-                seq = self.get_sequence()
-                doc['_rev'] = rev
-                self.db.update(self.table, where="id=$_id", rev=rev, seq=seq, doc=json.dumps(doc), vars=locals())
+                return self._update_doc(doc, old_doc['_rev'])
             else:
-                rev = "1"
-                seq = self.get_sequence()
-                doc['_rev'] = rev
-                self.db.insert(self.table, id=_id, rev=rev, seq=seq, doc=json.dumps(doc))
-            
-            return _id, rev
+                return self._new_doc(doc)
+    
+    def _update_doc(self, doc, old_rev):
+        if doc.get('_rev') != old_rev:
+            raise Conflict()
+        
+        _id = doc['_id']
+        rev = str(1 + int(old_rev))
+        seq = self.get_sequence()
+        doc['_rev'] = rev
+        self.db.update(self.table, where="id=$_id", rev=rev, seq=seq, doc=json.dumps(doc), vars=locals())
+        return doc['_id'], doc['_rev']
+        
+    def _new_doc(self, doc):
+        _id = doc.get("_id")
+        if not _id:
+            _id = generate_uuid()
+            doc['_id'] = _id
+    
+        rev = "1"
+        seq = self.get_sequence()
+        doc['_rev'] = rev
+        self.db.insert(self.table, id=_id, rev=rev, seq=seq, doc=json.dumps(doc))
+        return doc['_id'], doc['_rev']
     
     def get(self, docid):
         rows = self.db.select(self.table, where="id=$docid", vars=locals()).list()
         if rows:
             return json.loads(rows[0].doc)
+            
+    def delete(self, docid, rev):
+        with self.db.transaction():
+            old_doc = self.get(docid)
+            if not old_doc:
+                return None
+            else:
+                doc = {"_id": docid, '_rev': rev, '_deleted': True}
+                return self._update_doc(doc, rev)
+        
