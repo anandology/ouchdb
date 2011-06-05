@@ -20,9 +20,9 @@ create table views (
 
 DATABASE_TABLE = """
 create table %s (
-    seq integer primary key,
-    id text,
+    id text primary key,
     rev text,
+    seq integer unique,
     doc text
 )"""
 

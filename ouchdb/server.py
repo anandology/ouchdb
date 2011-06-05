@@ -1,28 +1,10 @@
 import json
 import web
 import os
-import urlparse
 
-from webapp import app, engine
-from version import VERSION
-
-class NotFound(web.HTTPError):
-    def __init__(self, data):
-        web.HTTPError.__init__(self, '404 Object Not Found', {}, json.dumps(data))
-
-class PreconditionFailed(web.HTTPError):
-    def __init__(self, data):
-        web.HTTPError.__init__(self, '412 Precondition Failed', {}, json.dumps(data))
-
-class Created(web.HTTPError):
-    def __init__(self, location, data):
-        location = urlparse.urljoin(web.ctx.path, location)
-        if location.startswith('/'):
-            location = web.ctx.home + location
-        headers = {
-            "Location": location
-        }
-        web.HTTPError.__init__(self, '201 Created', headers, json.dumps(data))
+from .webapp import app, engine
+from .version import VERSION
+from . import http
 
 class ouchdb(app.page):
     path = "/"
@@ -88,14 +70,14 @@ class database(app.page):
         if db:
             return json.dumps(db.info())
         else:
-            raise NotFound({"error":"not_found","reason":"no_db_file"})
+            raise http.NotFound({"error":"not_found","reason":"no_db_file"})
             
     def POST(self, name):
         db = engine.get_database(dbname)
         if db:
             return json.dumps(db.info())
         else:
-            raise NotFound({"error":"not_found","reason":"no_db_file"})
+            raise http.NotFound({"error":"not_found","reason":"no_db_file"})
         
 
     def PUT(self, name):
@@ -104,9 +86,9 @@ class database(app.page):
         db = engine.get_database(name)
         if db is None:
             engine.create_database(name)
-            raise Created("/" + name, {"ok": True})
+            raise http.Created("/" + name, {"ok": True})
         else:
-            raise PreconditionFailed({"error": "file_exists", "reason": "The database could not be created, the file already exists."})
+            raise http.PreconditionFailed({"error": "file_exists", "reason": "The database could not be created, the file already exists."})
 
     def DELETE(self, name):
         web.header("Content-Type", "text/plain;charset=utf-8")
@@ -114,4 +96,4 @@ class database(app.page):
         if engine.delete_database(name):
             return json.dumps({"ok": True})
         else:
-            raise NotFound({"error":"not_found","reason":"no_db_file"})
+            raise http.NotFound({"error":"not_found","reason":"no_db_file"})

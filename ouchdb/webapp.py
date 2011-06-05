@@ -1,9 +1,12 @@
 import web
+web.config.debug = True
+
 from engine import Engine
 
 app = web.auto_application()
 
-engine = Engine()
+db = web.database(dbn="sqlite", db="ouch.db")
+engine = Engine(db)
 
 def setup():
     import server

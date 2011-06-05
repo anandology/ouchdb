@@ -1,21 +1,27 @@
 import uuid
 import json
+import logging
 
 import web
 from . import schema
 
+logger = logging.getLogger("ouchdb.engine")
+
+class EngineException(Exception):
+    pass
+    
+class Conflict(EngineException):
+    pass
+
 class Engine:
-    def __init__(self):
-        self.init()
-        
-    def init(self):
-        self.db = web.database(dbn="sqlite", db="ouch.db")
+    def __init__(self, db):
+        self.db = db
         self.init_schema()
         
     def init_schema(self):
         if "databases" not in self._list_tables():
             for s in schema.SCHEMA.split(";"):
-                print s
+                logger.debug("query: %s", s)
                 self.db.query(s)
         
     def _list_tables(self):
@@ -54,7 +60,7 @@ class Engine:
     def get_database(self, name):
         rows = self.db.query("SELECT * FROM databases WHERE name=$name", vars=locals()).list()
         if rows:
-            return Database(**rows[0])
+            return Database(self.db, **rows[0])
         
     def list_databases(self):
         rows = self.db.query("SELECT name FROM databases")
@@ -69,7 +75,9 @@ def generate_uuid():
     return str(uuid.uuid1()).replace("-", "")
 
 class Database:
-    def __init__(self, id, name, **kw):
+    def __init__(self, db, id, name, **kw):
+        self.db = db
+        
         self.id = id
         self.name = name
         self.__dict__.update(kw)
@@ -89,12 +97,44 @@ class Database:
             "committed_update_seq": 0
         }
         
-    def list_docs(self):
-        rows = db.query("SELECT * FROM %s" % self.table)
+    def list(self):
+        rows = self.db.query("SELECT * FROM %s" % self.table)
         return rows.list()
         
-    def add_doc(self, doc):
-        with db.transaction():
-            _id = doc.get("id") or generate_uuid()
-            db.delete(self.table, where="id=$id", vars={"id": _d})
-            _rev = db.insert(self.table, id=id, doc=json.dumps(doc))
+    def get_sequence(self):
+        self.db.query("UPDATE databases SET sequence=sequence+1 WHERE id=$self.id", vars=locals())
+        d = self.db.query("SELECT sequence FROM databases WHERE id=$self.id", vars=locals())
+        return d[0].sequence
+        
+    def put(self, doc):
+        with self.db.transaction():
+            _id = doc.get("_id")
+            if _id:
+                old_doc = self.get(_id)
+            else:
+                _id = generate_uuid()
+                doc['_id'] = _id
+                old_doc = None
+                
+            
+            if old_doc:
+                if old_doc['_rev'] != doc.get('_rev'):
+                    raise Conflict()
+                    
+                
+                rev = str(1 + int(old_doc['_rev']))
+                seq = self.get_sequence()
+                doc['_rev'] = rev
+                self.db.update(self.table, where="id=$_id", rev=rev, seq=seq, doc=json.dumps(doc), vars=locals())
+            else:
+                rev = "1"
+                seq = self.get_sequence()
+                doc['_rev'] = rev
+                self.db.insert(self.table, id=_id, rev=rev, seq=seq, doc=json.dumps(doc))
+            
+            return _id, rev
+    
+    def get(self, docid):
+        rows = self.db.select(self.table, where="id=$docid", vars=locals()).list()
+        if rows:
+            return json.loads(rows[0].doc)
