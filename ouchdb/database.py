@@ -5,23 +5,49 @@ from .webapp import app, engine
 from . import http
 from .engine import Conflict
 
+def get_db(name):
+    db = engine.get_database(name)
+    if db:
+        return db
+    else:
+        raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+
 class all_docs(app.page):
     path = "/([^_/][^/]*)/_all_docs"
 
     def GET(self, dbname):
-        db = engine.get_database(dbname)
-        if db:
-            web.header("Content-Type", "text/plain;charset=utf-8")
-            # TODO: Implement real all docs
-            return '{"total_rows":0,"offset":0,"rows":[]}'
-        else:
-            raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+        db = get_db(dbname)
+        web.header("Content-Type", "text/plain;charset=utf-8")
+        kwargs = self.process_input(web.input())
+        result = db.view("_all_docs").query(**kwargs)
+        return json.dumps(result)
+            
+    def process_input(self, input):
+        d = {}
+
+        for k in ["key", "startkey", "endkey"]:
+            if k in input:
+                d[k] = json.loads(input[k])
+
+        for k in ["include_docs", "inclusive_end", "reduce", "descending"]:
+            if k in input:
+                d[k] = (input[k] == "true")
+        
+        for k in ["skip", "limit"]:
+            if k in input:
+                d[k] = int(input[k])
+        
+        for k in ["stale"]:
+            if k in input:
+                d[k] = input[k]
+
+        return d
 
 class document(app.page):
     path = "/([^_/][^/]*)/([^_/][^/]*)"
 
     def GET(self, dbname, docid):
-        db = engine.get_database(dbname)
+        db = get_db(dbname)
         doc = db.get(docid)
         if doc:
             web.header("Content-Type", "text/plain;charset=utf-8")
@@ -32,9 +58,7 @@ class document(app.page):
             raise http.NotFound({"error": "not_found", "reason": "missing"})
             
     def PUT(self, dbname, docid):
-        db = engine.get_database(dbname)
-        if not db:
-            raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+        db = get_db(dbname)
         
         data = json.loads(web.data())
         data['_id'] = docid
@@ -47,9 +71,7 @@ class document(app.page):
         return json.dumps({"ok": True, "id": _id, "rev": _rev})
         
     def DELETE(self, dbname, docid):
-        db = engine.get_database(dbname)
-        if not db:
-            raise http.NotFound({"error": "not_found", "reason": "no_db_file"})
+        db = get_db(dbname)
         
         try:
             i = web.input(rev=None)
@@ -58,4 +80,3 @@ class document(app.page):
             raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
         return json.dumps({"ok": True, "id": _id, "rev": _rev})
-        

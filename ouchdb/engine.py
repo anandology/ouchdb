@@ -96,6 +96,10 @@ class Database:
             "disk_format_version": 5,
             "committed_update_seq": 0
         }
+    
+    def view(self, name):
+        if name == "_all_docs":
+            return AllDocsView(self, "_all_docs")
         
     def list(self):
         rows = self.db.query("SELECT * FROM %s" % self.table)
@@ -124,7 +128,7 @@ class Database:
         rev = str(1 + int(old_rev))
         seq = self.get_sequence()
         doc['_rev'] = rev
-        self.db.update(self.table, where="id=$_id", rev=rev, seq=seq, doc=json.dumps(doc), vars=locals())
+        self.db.update(self.table, where="docid=$_id", rev=rev, seq=seq, doc=json.dumps(doc), vars=locals())
         return doc['_id'], doc['_rev']
         
     def _new_doc(self, doc):
@@ -136,11 +140,11 @@ class Database:
         rev = "1"
         seq = self.get_sequence()
         doc['_rev'] = rev
-        self.db.insert(self.table, id=_id, rev=rev, seq=seq, doc=json.dumps(doc))
+        self.db.insert(self.table, docid=_id, rev=rev, seq=seq, doc=json.dumps(doc))
         return doc['_id'], doc['_rev']
     
     def get(self, docid):
-        rows = self.db.select(self.table, where="id=$docid", vars=locals()).list()
+        rows = self.db.select(self.table, where="docid=$docid", vars=locals()).list()
         if rows:
             return json.loads(rows[0].doc)
             
@@ -153,3 +157,99 @@ class Database:
                 doc = {"_id": docid, '_rev': rev, '_deleted': True}
                 return self._update_doc(doc, rev)
         
+class View:
+    def __init__(self, database, viewname):
+        self.database = database
+        self.name = viewname
+        
+    def query(self, **kwargs):
+        include_docs = kwargs.get("include_docs", False)
+        descending = kwargs.get("descending", False)
+        
+        if descending:
+            # Reverse startkey and endkey since couchdb expects the descending
+            # option to be applied before key filtering.
+            
+            # None could be a valid value for startkey/endkey. Using a stub instead of None.
+            nothing = object()
+            startkey = kwargs.pop("startkey", nothing)
+            endkey = kwargs.pop("endkey", nothing)
+            if startkey is not nothing:
+                kwargs['endkey'] = startkey
+            if endkey is not nothing:
+                kwargs['startkey'] = endkey
+        
+        tables = self.get_tables(include_docs=include_docs)
+        what = self.get_what(include_docs=include_docs)
+        where = self.get_wheres(**kwargs) or ["1 = 1"]
+        where = web.SQLQuery.join(where, " AND ")
+        
+        kw = {}
+        if 'limit' in kwargs:
+            kw['limit'] = kwargs.pop('limit')
+        if 'skip' in kwargs:
+            kw['offset'] = kwargs.pop('skip')
+            
+        kw['order'] = self.get_order(descending)
+                    
+        rows = self.database.db.select(tables, what=what, where=where, **kw).list()
+            
+        rows = [self.process_row(row) for row in rows]
+        return {"total_rows": 0, "offset": 0, "rows": rows}
+        
+    def process_row(self, row):
+        return dict(row)
+        
+    def get_tables(self, include_docs=False):
+        raise NotImplementedError()
+        
+    def get_what(self, include_docs=False):
+        raise NotImplementedError()
+        
+    def get_wheres(self, **kwargs):
+        raise NotImplementedError()
+        
+    def get_order(self, descending):
+        if descending:
+            return "key DESC"
+        else:
+            return "key"
+        
+class AllDocsView(View):
+    def get_tables(self, include_docs=False):
+        return self.database.table
+        
+    def get_what(self, include_docs=False):
+        if include_docs:
+            return "docid as key, rev, doc"
+        else:
+            return "docid as key, rev"
+
+    def get_wheres(self, **kwargs):
+        wheres = []
+        
+        def add(name, op, value):
+            q = web.SQLQuery([name, op, web.sqlparam(value)])
+            wheres.append(q)
+        
+        if "key" in kwargs:
+            key = kwargs['key']
+            add("key", " = ", key)
+        elif "startkey" in kwargs or "endkey" in kwargs:
+            if "startkey" in kwargs:
+                startkey = kwargs["startkey"]
+                add("key", " >= ", startkey)
+            if "endkey" in kwargs:
+                endkey = kwargs["endkey"]
+                add("key", " < ", endkey)
+        return wheres
+        
+    def process_row(self, row):
+        d = {
+            "id": row.key,
+            "key": row.key,
+            "value": {"rev": row.rev}
+        }
+        if "doc" in row:
+            d["doc"] = json.loads(row.doc)
+        return d

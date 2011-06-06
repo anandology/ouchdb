@@ -4,7 +4,7 @@ import os
 
 from .webapp import app, engine
 from .version import VERSION
-from .engine import Conflict
+from .engine import Conflict, generate_uuid
 from . import http
 
 class ouchdb(app.page):
@@ -40,7 +40,7 @@ class _uuids(app.page):
         except ValueError:
             return '{"error":"unknown_error","reason":"badarg"}'
 
-        uuids = [engine.generate_uuid() for i in range(count)]
+        uuids = [generate_uuid() for i in range(count)]
         return json.dumps({"uuids": uuids})
 
 class _utils(app.page):
@@ -103,3 +103,12 @@ class database(app.page):
             return json.dumps({"ok": True})
         else:
             raise http.NotFound({"error":"not_found","reason":"no_db_file"})
+
+class config(app.page):
+    """Dummy config"""
+    
+    path = "/_config/.*"
+    
+    def GET(self):
+        web.header("Content-Type", "text/plain;charset=utf-8")        
+        return '{}'

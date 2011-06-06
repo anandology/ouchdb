@@ -20,7 +20,7 @@ create table views (
 
 DATABASE_TABLE = """
 create table %s (
-    id text primary key,
+    docid text primary key,
     rev text,
     seq integer unique,
     doc text
@@ -29,6 +29,7 @@ create table %s (
 VIEW_TABLE = """
 create table %s (
     id integer primary key,
+    docid text,
     key text,
     value text,
     seq integer
