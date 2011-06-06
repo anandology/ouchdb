@@ -1,15 +1,16 @@
 from setuptools import setup, find_packages
-import stat
-
-def executable(path):
-    st = os.stat(path)[stat.ST_MODE]
-    return (st & stat.S_IEXEC) and not stat.S_ISDIR(st)
+from ouchdb.version import VERSION
 
 setup(
     name='ouchdb',
-    version='0.0.1',
-    description='OuchDB is CouchDB on SQL',
+    version=VERSION,
+    description='OuchDB is an implementation of CouchDB API on relational databases',
     packages=find_packages(exclude=["ez_setup"]),
-    scripts=filter(executable, glob.glob('scripts/*')),
-    install_requires="web.py gunicorn".split()
+    install_requires="web.py gunicorn".split(),
+
+    author="Anand Chitipothu",
+    author_email="anandology@gmail.com",
+
+    license="Apache License, Version 2.0",
+    platforms=["any"],
 )
