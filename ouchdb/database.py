@@ -80,3 +80,32 @@ class document(app.page):
             raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
         return json.dumps({"ok": True, "id": _id, "rev": _rev})
+
+
+class db_compact(app.page):
+    path = "/([^_/][^/]*)/_compact"
+    
+    def POST(self, dbname):
+        db = get_db(dbname)
+        
+        web.header("Content-Type", "text/plain;charset=utf-8")
+        return json.dumps({"ok": True})
+
+
+class view_compact(app.page):
+    path = "/([^_/][^/]*)/_compact/(.*)"
+
+    def POST(self, dbname, designdoc):
+        db = get_db(dbname)
+        
+        web.header("Content-Type", "text/plain;charset=utf-8")
+        return json.dumps({"ok": True})
+
+class view_cleanup(app.page):
+    path = "/([^_/][^/]*)/_view_cleanup"
+
+    def POST(self, dbname):
+        db = get_db(dbname)
+        
+        web.header("Content-Type", "text/plain;charset=utf-8")
+        return json.dumps({"ok": True})

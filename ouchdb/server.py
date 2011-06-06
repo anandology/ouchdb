@@ -112,3 +112,18 @@ class config(app.page):
     def GET(self):
         web.header("Content-Type", "text/plain;charset=utf-8")        
         return '{}'
+        
+class active_tasks(app.page):
+    path = "/_active_tasks"
+    
+    def GET(self):
+        web.header("Content-Type", "text/plain;charset=utf-8")        
+        return '[]'
+        
+class session(app.page):
+    path = "/_session"
+    
+    def GET(self):
+        web.header("Content-Type", "text/plain;charset=utf-8")        
+        return '{"ok":true}'
+        
