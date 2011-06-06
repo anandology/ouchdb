@@ -1,2 +1,4 @@
 *.pyc
 *.db
+build/
+docs/_build/
