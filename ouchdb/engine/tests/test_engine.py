@@ -13,7 +13,7 @@ def test_engine():
     assert e.get_database("foo") is not None
 
     e.create_database("bar")
-    assert e.list_databases() == ["foo", "bar"]
+    assert e.list_databases() == ["bar", "foo"]
     assert e.get_database("bar") is not None
 
     e.delete_database("foo")
