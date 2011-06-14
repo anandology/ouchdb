@@ -60,10 +60,10 @@ class TestDatabase:
         assert self.db.list() == []
         
     def test_all_docs(self):
-        view = self.db.view("_all_docs")
-        assert view.query() == {"total_rows": 0, "offset": 0, "rows": []}
+        view = self.db.get_all_docs_view()
+        assert view.query().as_dict() == {"total_rows": 0, "offset": 0, "rows": []}
         
         self.db.put({"_id": "foo", "x": 1})
-        assert view.query() == {"total_rows": 0, "offset": 0, "rows": [
+        assert view.query().as_dict() == {"total_rows": 0, "offset": 0, "rows": [
             {"id": "foo", "key": "foo", "value": {"rev": "1"}}
         ]}

@@ -2,15 +2,31 @@ from collections import defaultdict
 import json
 import logging
 from types import FunctionType
+import hashlib
 
 from . import errors
 
 logger = logging.getLogger("ouchdb.designdoc")
 
 class DesignDoc(dict):
-    def __init__(self, *a, **kw):
+    def __init__(self, database, *a, **kw):
         dict.__init__(self, *a, **kw)
+        self.database = database
         self.function_cache = defaultdict(dict)
+        
+    def get_table(self):
+        """Returns the name of the sql database table used to store views of this design document."""
+        jsontext = json.dumps(self, sort_keys=True)
+        md5 = hashlib.md5(jsontext).hexdigest()
+        return "design_%s_%s" % (self.database.name, md5)
+        
+    def get_view(self, name):
+        """Returns the view object with the given name if exists, None otherwise.
+        """
+        if name in self.get("views", {}):
+            return View(self, name)
+        else:
+            raise errors.NotFound("missing_named_view")
         
     def get_map_function(self, view):
         return self.get_view_function(view, "map")
@@ -53,9 +69,8 @@ class DesignDoc(dict):
     def map(self, doc):
         """Returns (viewname, docid, key, value) for each key-value pair emitted by the view.
         """
-        rows = {}
-        for view in self.get("views", []):
+        for view in self.get("views", {}):
             _map = self.get_map_function(view)
             for key, value in _map(doc):
-                yield view, doc['_id'], key, value            
+                yield view, doc['_id'], key, value       
     

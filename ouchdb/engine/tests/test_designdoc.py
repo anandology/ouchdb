@@ -6,7 +6,7 @@ import pytest
 class TestDesignDoc:
     
     def test_map_with_empty_designdoc(self):
-        ddoc = DesignDoc({})
+        ddoc = DesignDoc(None, {})
         doc = {}
         assert list(ddoc.map(doc)) == []
     
@@ -18,7 +18,7 @@ class TestDesignDoc:
                 }
             }
         }
-        ddoc = DesignDoc(ddoc)
+        ddoc = DesignDoc(None, ddoc)
         
         doc = {"_id": "doc1", "name": "ouchdb"}
         assert list(ddoc.map(doc)) == [
@@ -33,13 +33,13 @@ class TestDesignDoc:
                 }
             }
         }
-        ddoc = DesignDoc(ddoc)
+        ddoc = DesignDoc(None, ddoc)
         with pytest.raises(CompileError):
             list(ddoc.map({}))
         
     def _get_compile_error(self, code):
         try:
-            ddoc = DesignDoc({})
+            ddoc = DesignDoc(None, {})
             ddoc._compile(code, fullname="")
         except CompileError, e:
             return e.args[0]
