@@ -16,7 +16,7 @@ import os
 
 from .webapp import app, engine
 from .version import VERSION
-from .engine import Conflict, generate_uuid
+from .engine import generate_uuid, errors
 from . import http
 
 class ouchdb(app.page):
@@ -93,7 +93,7 @@ class database(app.page):
         data = json.loads(web.data())
         try:
             _id, _rev = db.put(data)
-        except Conflict:
+        except errors.Conflict:
             raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
         return json.dumps({"ok": True, "id": _id, "rev": _rev})

@@ -15,7 +15,7 @@ import json
 
 from .webapp import app, engine
 from . import http
-from .engine import Conflict
+from .engine import errors
 
 def get_db(name):
     db = engine.get_database(name)
@@ -77,7 +77,7 @@ class document(app.page):
         
         try:
             _id, _rev = db.put(data)
-        except Conflict:
+        except errors.Conflict:
             raise http.Conflict({"error": "conflict", "reason": "Document update conflict."})
         
         return json.dumps({"ok": True, "id": _id, "rev": _rev})

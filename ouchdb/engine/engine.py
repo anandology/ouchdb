@@ -19,12 +19,6 @@ from . import schema
 
 logger = logging.getLogger("ouchdb.engine")
 
-class EngineException(Exception):
-    pass
-    
-class Conflict(EngineException):
-    pass
-
 class Engine:
     def __init__(self, db):
         self.db = db
