@@ -26,7 +26,7 @@ def get_db(name):
 
 
 class document(app.page):
-    path = "/([^_/][^/]*)/([^_/][^/]*)"
+    path = "/([^_/][^/]*)/((?:|_design/)[^_/][^/]*)"
 
     def GET(self, dbname, docid):
         db = get_db(dbname)

@@ -28,3 +28,12 @@ class TestViewResponse:
         jsoniter = x.to_json()
         
         
+    def test_lookahead(self):
+        x = view.ViewResponse(0, 0, [])
+        assert list(x.lookahead([])) == []
+        assert list(x.lookahead([1])) == [(1, None)] 
+        assert list(x.lookahead([1, 2])) == [(1, 2), (2, None)]
+        assert list(x.lookahead([1, 2, 3, 4, 5])) == [(1, 2), (2, 3), (3, 4), (4, 5), (5, None)]
+        
+        assert list(x.lookahead([1], end="END")) == [(1, 'END')] 
+        

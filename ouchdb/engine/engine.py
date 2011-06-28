@@ -15,7 +15,7 @@ import json
 import logging
 
 import web
-from . import schema, view
+from . import schema, view, designdoc
 
 logger = logging.getLogger("ouchdb.engine")
 
@@ -33,6 +33,9 @@ class Engine:
     def _list_tables(self):
         rows = self.db.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row.name for row in rows]
+        
+    def has_table(self, table_name):
+        return table_name in self._list_tables()
             
     def create_database(self, name):
         t = self.db.transaction()
@@ -48,6 +51,9 @@ class Engine:
         finally:
             t.commit()
         return False
+        
+    def create_view_table(self, table_name):
+        self.db.query(schema.VIEW_TABLE % table_name)
             
     def delete_database(self, name):
         t = self.db.transaction()
@@ -66,7 +72,7 @@ class Engine:
     def get_database(self, name):
         rows = self.db.query("SELECT * FROM databases WHERE name=$name", vars=locals()).list()
         if rows:
-            return Database(self.db, **rows[0])
+            return Database(self, self.db, **rows[0])
         
     def list_databases(self):
         rows = self.db.query("SELECT name FROM databases ORDER BY name")
@@ -81,7 +87,8 @@ def generate_uuid():
     return str(uuid.uuid1()).replace("-", "")
 
 class Database:
-    def __init__(self, db, id, name, **kw):
+    def __init__(self, engine, db, id, name, **kw):
+        self.engine = engine
         self.db = db
         
         self.id = id
@@ -102,7 +109,7 @@ class Database:
             "disk_format_version": 5,
             "committed_update_seq": 0
         }
-            
+
     def list(self):
         rows = self.db.query("SELECT * FROM %s" % self.table)
         return rows.list()
@@ -110,7 +117,7 @@ class Database:
     def get_design_doc(self, name):
         if name.startswith("_design/"):
             doc = self.get(name)
-            if name:
+            if doc:
                 return designdoc.DesignDoc(self, doc)
         raise errors.NotFound("missing")
     
@@ -168,3 +175,13 @@ class Database:
             else:
                 doc = {"_id": docid, '_rev': rev, '_deleted': True}
                 return self._update_doc(doc, rev)
+
+    def get_docs_since(self, seq):
+        """Returns all the docs which have sequence > seq.
+        """
+        def process(row):
+            row.doc = json.loads(row.doc)
+            return row
+        rows = self.db.select(self.table, where="seq > $seq", order="seq", vars=locals())
+        return (process(row) for row in rows)
+        

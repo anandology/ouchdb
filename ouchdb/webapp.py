@@ -12,6 +12,7 @@
 
 import web
 web.config.debug = True
+import logging
 
 from engine import Engine
 
@@ -20,6 +21,12 @@ app = web.auto_application()
 db = web.database(dbn="sqlite", db="ouch.db")
 engine = Engine(db)
 
+logger = logging.getLogger("ouchdb")
+
 def setup():
     import server
     import database
+    
+    logging.basicConfig(format="%(asctime)s [%(name)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
+    logger.info("Welcome")
+    

@@ -1,7 +1,10 @@
 """OuchDB views.
 """
-import simplejson
+import json
 import web
+import logging
+
+logger = logging.getLogger("ouchdb.view")
 
 class ViewResponse:
     def __init__(self, total_rows, offset, rows):
@@ -10,16 +13,22 @@ class ViewResponse:
         self.rows = rows
         
     def to_json(self):
-        """Returns an iterator with JSON"""
-        yield '{"total_rows":%d,"offset":%d,"rows": [' % (self.total_rows, self.offset)
-        for row, ahead in self.lookahead(self.rows):
-            yield "\n"
-            yield simplejson.dumps(row, sort_keys=True, separators=(",", ":"))
-            if ahead:
-                yield ","
-            else:
+        """Returns an iterator with JSON.
+        """
+        try:
+            yield '{"total_rows":%d,"offset":%d,"rows": [' % (self.total_rows, self.offset)
+            for row, ahead in self.lookahead(self.rows):
                 yield "\n"
-        yield ']}'
+                yield json.dumps(row, sort_keys=True, separators=(",", ":"))
+                if ahead:
+                    yield ","
+                else:
+                    yield "\n"
+            yield ']}'
+        except:
+            import traceback
+            traceback.print_exc()
+            raise StopIteration
         
     def as_dict(self):
         return {
@@ -36,8 +45,9 @@ class ViewResponse:
         
         for ahead in it:
             yield current, ahead
+            current = ahead
         
-        yield ahead, end
+        yield current, end
         
 class Query:
     def __init__(self, db, tables=[]):
@@ -57,8 +67,15 @@ class Query:
         self.limit = options.get("limit")
         self.offset = options.get("offset")
         
+        _test = options.get("_test", False)
+        
+        if isinstance(self.what, list):
+            what = ", ".join(self.what)
+        else:
+            what = self.what
+        
         where = web.SQLQuery.join(self.wheres or ["1 = 1"], " AND ")
-        return self.db.select(self.tables, what=self.what, where=where, offset=self.offset, limit=self.limit)
+        return self.db.select(self.tables, what=what, where=where, offset=self.offset, limit=self.limit, order=self.order, _test=_test)
         
     def process_wheres(self, options):
         def add(name, op, value):
@@ -102,8 +119,14 @@ class View:
     def __repr__(self):
         name = self.designdoc['_id'] + "/_view/" + self.name
         return "<View: %r>" % name
+
+    def update(self, stale=None):
+        self.designdoc.update(stale=stale)
         
     def query(self, **options):
+        stale = options.get("stale", "not-ok")
+        self.update(stale=stale)
+        
         query = self.make_query(options)
         rows = query.execute(options)
         rows = [self.process_row(row) for row in rows]
@@ -113,21 +136,28 @@ class View:
         db = self.designdoc.database.db
         table = self.designdoc.get_table()
         q = Query(db, [table + " as design"])
-        q.what = "design.docid, design.key, design.value"
+        q.what = ["design.docid as id", "design.key", "design.value"]
         
         include_docs = options.get("include_docs", False)
         if include_docs:
             db_table = self.designdoc.database.table
             q.tables.append(db_table + " as doc")
-            q.where("design.docid = doc.docid")
+            q.what.append("doc.doc")
+            q.wheres.append("design.docid = doc.docid")
         return q
         
-    def process_row(row):
+    def process_row(self, row):
+        if "doc" in row:
+            row["doc"] = json.loads(row["doc"])
         return row
 
 class AllDocsView(View):
     def __init__(self, database):
         self.database = database
+        
+    def update(self, stale=None):
+        # Nothing to update
+        pass
         
     def make_query(self, options):
         q = Query(self.database.db, self.database.table)

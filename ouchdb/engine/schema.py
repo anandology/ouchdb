@@ -41,6 +41,7 @@ create table %s (
 VIEW_TABLE = """
 create table %s (
     id integer primary key,
+    view text,
     docid text,
     key text,
     value text,
